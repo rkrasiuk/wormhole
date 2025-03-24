@@ -1,0 +1,21 @@
+[package]
+name = "alloy-wormhole"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+alloy-primitives.workspace = true
+alloy-eip2930 = { workspace = true, default-features = false }
+alloy-serde = { workspace = true, optional = true }
+
+sha2 = { workspace = true, default-features = false }
+getrandom.workspace = true
+derive_more = { version = "2", default-features = false, features = ["as_ref"] }
+
+# `serde` feature
+serde = { workspace = true, features = ["derive"], optional = true }
+serde_with = { workspace = true, optional = true }
+
+[features]
+serde = ["dep:serde", "dep:serde_with", "dep:alloy-serde", "alloy-eip2930/serde"]
+sp1 = []

@@ -1,0 +1,18 @@
+[package]
+name = "wormhole"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# alloy
+alloy-primitives.workspace = true
+alloy-wormhole = { workspace = true, features = ["serde", "sp1"] }
+
+# sp1
+sp1-sdk.workspace = true
+
+clap.workspace = true
+anyhow.workspace = true
+
+[build-dependencies]
+sp1-build.workspace = true
