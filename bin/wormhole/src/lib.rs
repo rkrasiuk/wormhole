@@ -1,4 +1,4 @@
-use alloy_primitives::hex;
+use alloy_primitives::{hex, U256};
 use alloy_wormhole::WormholeSecret;
 use clap::{Parser, Subcommand};
 use sp1::Sp1Command;
@@ -21,7 +21,7 @@ impl Cli {
                 println!("Generated new secret in {:?}", started_at.elapsed());
                 println!("Secret: {}", hex::encode(secret.as_ref()));
                 println!("Burn Address: {}", secret.burn_address());
-                println!("Nullifier: {}", secret.nullifier());
+                println!("Nullifier(0): {}", secret.nullifier(U256::ZERO));
                 Ok(())
             }
             Command::Sp1(cmd) => cmd.run(),

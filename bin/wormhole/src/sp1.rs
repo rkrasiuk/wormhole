@@ -86,16 +86,31 @@ struct Sp1ProgramArgs {
     secret: Bytes,
 
     #[clap(long)]
-    deposit_value: U256,
+    deposit_amount: U256,
 
     #[clap(long)]
-    withdraw_value: U256,
+    withdraw_amount: U256,
+
+    #[clap(long)]
+    cumulative_withdrawn_amount: U256,
+
+    #[clap(long)]
+    withdrawal_index: U256,
 
     #[clap(long)]
     state_root: B256,
 
     #[clap(long, num_args = 1.., value_delimiter = ',')]
-    deposit_proof: Vec<Bytes>,
+    deposit_account_proof: Vec<Bytes>,
+
+    #[clap(long, num_args = 1.., value_delimiter = ',')]
+    nullifier_account_proof: Vec<Bytes>,
+
+    #[clap(long, value_delimiter = ',')]
+    previous_nullifier_storage_proof: Vec<Bytes>,
+
+    #[clap(long, num_args = 1.., value_delimiter = ',')]
+    nullifier_storage_proof: Vec<Bytes>,
 }
 
 impl Sp1ProgramArgs {
@@ -103,10 +118,15 @@ impl Sp1ProgramArgs {
         let secret = WormholeSecret::try_from(self.secret).unwrap();
         Sp1Input {
             secret,
-            deposit_amount: self.deposit_value,
-            withdraw_amount: self.withdraw_value,
+            deposit_amount: self.deposit_amount,
+            withdraw_amount: self.withdraw_amount,
+            cumulative_withdrawn_amount: self.cumulative_withdrawn_amount,
+            withdrawal_index: self.withdrawal_index,
             state_root: self.state_root,
-            deposit_account_proof: self.deposit_proof,
+            deposit_account_proof: self.deposit_account_proof,
+            nullifier_account_proof: self.nullifier_account_proof,
+            previous_nullifier_storage_proof: self.previous_nullifier_storage_proof,
+            nullifier_storage_proof: self.nullifier_storage_proof,
         }
     }
 }
