@@ -7578,7 +7578,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "wormhole-program"
+name = "wormhole-program-core"
 version = "0.12.5"
 dependencies = [
  "alloy-primitives",
@@ -7593,7 +7593,7 @@ name = "wormhole-program-pico"
 version = "0.12.5"
 dependencies = [
  "pico-sdk",
- "wormhole-program",
+ "wormhole-program-core",
 ]
 
 [[package]]
@@ -7601,7 +7601,7 @@ name = "wormhole-program-risc0"
 version = "0.12.5"
 dependencies = [
  "risc0-zkvm",
- "wormhole-program",
+ "wormhole-program-core",
 ]
 
 [[package]]
@@ -7609,7 +7609,7 @@ name = "wormhole-program-sp1"
 version = "0.12.5"
 dependencies = [
  "sp1-zkvm",
- "wormhole-program",
+ "wormhole-program-core",
 ]
 
 [[package]]

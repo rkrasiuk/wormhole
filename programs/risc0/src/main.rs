@@ -3,7 +3,7 @@
 #![no_main]
 #![no_std]
 
-use wormhole_program::{execute_wormhole_program, WormholeProgramInput};
+use wormhole_program_core::{execute_wormhole_program, WormholeProgramInput};
 
 risc0_zkvm::guest::entry!(main);
 

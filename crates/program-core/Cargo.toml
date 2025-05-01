@@ -1,5 +1,5 @@
 [package]
-name = "wormhole-program"
+name = "wormhole-program-core"
 version.workspace = true
 edition.workspace = true
 

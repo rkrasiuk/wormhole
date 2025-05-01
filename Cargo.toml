@@ -30,7 +30,7 @@ redundant-clone = "warn"
 
 [workspace.dependencies]
 alloy-wormhole = { path = "crates/alloy-wormhole" }
-wormhole-program = { path = "crates/program" }
+wormhole-program-core = { path = "crates/program-core" }
 
 # alloy
 alloy-primitives = { version = "0.8", default-features = false }

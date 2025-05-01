@@ -2,7 +2,7 @@
 
 #![no_main]
 
-use wormhole_program::{execute_wormhole_program, WormholeProgramInput};
+use wormhole_program_core::{execute_wormhole_program, WormholeProgramInput};
 
 sp1_zkvm::entrypoint!(main);
 

@@ -4,7 +4,7 @@ build-program-sp1:
 
 .PHONY: build-program-risc0
 build-program-risc0:
-	cd programs/risc0 && cargo risczero build
+	cargo risczero build -p wormhole-program-risc0
 
 .PHONY: build-program-pico
 build-program-pico:

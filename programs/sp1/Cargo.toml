@@ -4,5 +4,5 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-wormhole-program = { workspace = true, features = ["serde"] }
+wormhole-program-core = { workspace = true, features = ["serde"] }
 sp1-zkvm.workspace = true

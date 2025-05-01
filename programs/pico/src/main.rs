@@ -2,7 +2,7 @@
 
 #![no_main]
 
-use wormhole_program::{execute_wormhole_program, WormholeProgramInput};
+use wormhole_program_core::{execute_wormhole_program, WormholeProgramInput};
 
 pico_sdk::entrypoint!(main);
 
