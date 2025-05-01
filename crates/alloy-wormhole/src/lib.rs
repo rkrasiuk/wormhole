@@ -9,9 +9,6 @@ pub use constants::*;
 pub mod secret;
 pub use secret::WormholeSecret;
 
-#[cfg(feature = "sp1")]
-pub mod sp1;
-
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
@@ -71,7 +68,7 @@ pub struct WormholeTx {
     /// The block number of the state root the proof is for.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub proof_block_number: u64,
-    /// The public inputs to the
+    /// TODO:
     pub proof: WormholeTxProof,
 }
 

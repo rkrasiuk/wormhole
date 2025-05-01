@@ -18,4 +18,3 @@ serde_with = { workspace = true, optional = true }
 
 [features]
 serde = ["dep:serde", "dep:serde_with", "dep:alloy-serde", "alloy-eip2930/serde"]
-sp1 = []

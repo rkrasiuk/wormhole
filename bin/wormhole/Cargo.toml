@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 # alloy
 alloy-primitives.workspace = true
-alloy-wormhole = { workspace = true, features = ["serde", "sp1"] }
+alloy-wormhole = { workspace = true, features = ["serde"] }
 
 # sp1
 sp1-sdk.workspace = true

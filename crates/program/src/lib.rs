@@ -1,17 +1,9 @@
-//! The program for verifying Wormhole Ether deposits.
-
-#![no_main]
-sp1_zkvm::entrypoint!(main);
-
-use alloy_primitives::{keccak256, B256, U256};
+use alloy_primitives::{keccak256, Bytes, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_trie::{nodes::TrieNode, proof::verify_proof, Nibbles, TrieAccount};
-use alloy_wormhole::{sp1::Sp1Input, WORMHOLE_NULLIFIER_ADDRESS};
+use alloy_wormhole::{WormholeSecret, WORMHOLE_NULLIFIER_ADDRESS};
 
-fn main() {
-    // Read input.
-    let input = sp1_zkvm::io::read::<Sp1Input>();
-
+pub fn execute_wormhole_program(input: WormholeProgramInput) -> WormholeProgramOutput {
     // Validate the input.
     assert!(input.secret.is_valid(), "Secret must be valid");
 
@@ -25,7 +17,12 @@ fn main() {
         }
     }
 
-    if input.withdraw_amount + input.cumulative_withdrawn_amount > input.deposit_amount {
+    if input
+        .withdraw_amount
+        .checked_add(input.cumulative_withdrawn_amount)
+        .unwrap()
+        < input.deposit_amount
+    {
         panic!("withdraw amounts exceed the original deposit amount")
     }
 
@@ -67,11 +64,13 @@ fn main() {
     .expect("nullifier account proof validation failed");
 
     // Verify previous withdrawal nullifier inclusion storage proof.
+    let cumulative_withdrawn_amount_hashed =
+        keccak256(B256::new(input.cumulative_withdrawn_amount.to_be_bytes()));
     if !input.withdrawal_index.is_zero() {
         let previous_withdrawal_index = input.withdrawal_index - U256::from(1);
         let previous_nullifier = input.secret.nullifier(previous_withdrawal_index);
         let previous_nullifier_nibbles = Nibbles::unpack(keccak256(previous_nullifier));
-        let expected = alloy_rlp::encode_fixed_size(&input.cumulative_withdrawn_amount).to_vec();
+        let expected = alloy_rlp::encode_fixed_size(&cumulative_withdrawn_amount_hashed).to_vec();
         verify_proof(
             nullifier_account.storage_root,
             previous_nullifier_nibbles,
@@ -81,19 +80,53 @@ fn main() {
         .expect("previous nullifier inclusion storage proof validation failed");
     }
 
-    // Verify current withdrawal nullifier exclusion storage proof.
+    // Compute current nullifier to commit to.
     let current_nullifier = input.secret.nullifier(input.withdrawal_index);
-    let current_nullifier_nibbles = Nibbles::unpack(keccak256(current_nullifier));
-    verify_proof(
-        nullifier_account.storage_root,
-        current_nullifier_nibbles,
-        None,
-        &input.nullifier_storage_proof,
-    )
-    .expect("nullifier exclusion storage proof validation failed");
 
-    // Commit to the public values of the program.
-    sp1_zkvm::io::commit::<B256>(&input.state_root);
-    sp1_zkvm::io::commit::<B256>(&current_nullifier);
-    sp1_zkvm::io::commit::<U256>(&input.withdraw_amount);
+    // Return the program output.
+    WormholeProgramOutput {
+        state_root: input.state_root,
+        withdraw_amount: input.withdraw_amount,
+        current_nullifier,
+        cumulative_withdrawn_amount_hashed,
+    }
+}
+
+/// The input into zkvm program.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WormholeProgramInput {
+    /// The Wormhole secret.
+    pub secret: WormholeSecret,
+    /// The deposit (burn) amount.
+    pub deposit_amount: U256,
+    /// The withdraw amount.
+    pub withdraw_amount: U256,
+    /// The cumulative withdrawn amount.
+    pub cumulative_withdrawn_amount: U256,
+    /// The index of the current withdrawal.
+    pub withdrawal_index: U256,
+    /// The state root of the block to validate against.
+    pub state_root: B256,
+    /// The deposit account proof.
+    pub deposit_account_proof: Vec<Bytes>,
+    /// The Wormhole nullifier contract account proof.
+    pub nullifier_account_proof: Vec<Bytes>,
+    /// The inclusion storage proof of previous nullifier.
+    /// Must be empty if withdrawal index is zero.
+    pub previous_nullifier_storage_proof: Vec<Bytes>,
+}
+
+/// The output of the zkvm program.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct WormholeProgramOutput {
+    /// The state root of the block to validate against provided as part of the input.
+    pub state_root: B256,
+    /// The withdraw amount provided as part of the input.
+    pub withdraw_amount: U256,
+    /// The nullifier the withdrawal is for.
+    pub current_nullifier: B256,
+    /// The keccak256 of cumulative withdrawn amount.
+    pub cumulative_withdrawn_amount_hashed: B256,
 }

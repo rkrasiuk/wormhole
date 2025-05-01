@@ -2,7 +2,7 @@
 members = [
     "bin/*",
     "crates/*",
-    "program",
+    "programs/*",
 ]
 resolver = "2"
 
@@ -30,6 +30,7 @@ redundant-clone = "warn"
 
 [workspace.dependencies]
 alloy-wormhole = { path = "crates/alloy-wormhole" }
+wormhole-program = { path = "crates/program" }
 
 # alloy
 alloy-primitives = { version = "0.8", default-features = false }
@@ -42,6 +43,12 @@ alloy-trie = { version = "0.7", default-features = false }
 sp1-sdk = "4.0.0"
 sp1-zkvm = "4.0.0"
 sp1-build = "4.0.0"
+
+# risc0
+risc0-zkvm = "2.0.2"
+
+# pico
+pico-sdk = { git = "https://github.com/brevis-network/pico" }
 
 serde = { version = "1.0", default-features = false }
 serde_with = { version = "3", default-features = false }

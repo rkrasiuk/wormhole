@@ -108,9 +108,6 @@ struct Sp1ProgramArgs {
 
     #[clap(long, value_delimiter = ',')]
     previous_nullifier_storage_proof: Vec<Bytes>,
-
-    #[clap(long, num_args = 1.., value_delimiter = ',')]
-    nullifier_storage_proof: Vec<Bytes>,
 }
 
 impl Sp1ProgramArgs {
@@ -126,7 +123,6 @@ impl Sp1ProgramArgs {
             deposit_account_proof: self.deposit_account_proof,
             nullifier_account_proof: self.nullifier_account_proof,
             previous_nullifier_storage_proof: self.previous_nullifier_storage_proof,
-            nullifier_storage_proof: self.nullifier_storage_proof,
         }
     }
 }
