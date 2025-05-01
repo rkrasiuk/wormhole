@@ -1,0 +1,8 @@
+[package]
+name = "wormhole-program-pico"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wormhole-program-core = { workspace = true, features = ["serde"] }
+pico-sdk.workspace = true

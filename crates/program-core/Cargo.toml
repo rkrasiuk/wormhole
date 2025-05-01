@@ -1,11 +1,16 @@
 [package]
-name = "wormhole-program"
+name = "wormhole-program-core"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 alloy-primitives = { workspace = true, features = ["serde"] }
-alloy-wormhole = { workspace = true, features = ["serde", "sp1"] }
 alloy-rlp.workspace = true
 alloy-trie = { workspace = true, features = ["ethereum"] }
-sp1-zkvm.workspace = true
+alloy-wormhole = { workspace = true, features = ["serde"] }
+
+# `serde` feature
+serde = { workspace = true, features = ["derive"], optional = true }
+
+[features]
+serde = ["dep:serde"]

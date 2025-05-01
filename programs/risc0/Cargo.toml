@@ -1,0 +1,8 @@
+[package]
+name = "wormhole-program-risc0"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+wormhole-program-core = { workspace = true, features = ["serde"] }
+risc0-zkvm.workspace = true
