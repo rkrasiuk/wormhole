@@ -12,5 +12,8 @@ alloy-wormhole = { workspace = true, features = ["serde"] }
 # `serde` feature
 serde = { workspace = true, features = ["derive"], optional = true }
 
+[dev-dependencies]
+alloy-wormhole = { workspace = true, features = ["test-utils"] }
+
 [features]
 serde = ["dep:serde"]

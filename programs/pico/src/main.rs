@@ -11,7 +11,7 @@ pub fn main() {
     let input = pico_sdk::io::read_as::<WormholeProgramInput>();
 
     // Execute the program.
-    let output = execute_wormhole_program(input);
+    let output = execute_wormhole_program(input).expect("program success");
 
     // Commit to the public values of the program.
     pico_sdk::io::commit(&output);

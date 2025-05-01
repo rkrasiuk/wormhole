@@ -7575,6 +7575,7 @@ dependencies = [
  "clap",
  "sp1-build",
  "sp1-sdk",
+ "wormhole-program-core",
 ]
 
 [[package]]

@@ -1,12 +1,34 @@
 use alloy_primitives::{keccak256, Bytes, B256, U256};
 use alloy_rlp::Decodable;
-use alloy_trie::{nodes::TrieNode, proof::verify_proof, Nibbles, TrieAccount};
+use alloy_trie::{
+    nodes::TrieNode,
+    proof::{verify_proof, ProofVerificationError},
+    Nibbles, TrieAccount,
+};
 use alloy_wormhole::{WormholeSecret, WORMHOLE_NULLIFIER_ADDRESS};
+use core::fmt;
 
-pub fn execute_wormhole_program(input: WormholeProgramInput) -> WormholeProgramOutput {
+pub fn execute_wormhole_program(
+    input: WormholeProgramInput,
+) -> Result<WormholeProgramOutput, WormholeProgramError> {
     // Validate the input.
-    assert!(input.secret.is_valid(), "Secret must be valid");
+    if !input.secret.is_valid() {
+        return Err(WormholeProgramError::InvalidSecret);
+    }
 
+    // Validate withdraw amount
+    if input.withdraw_amount.is_zero() {
+        return Err(WormholeProgramError::InvalidWithdrawAmount);
+    }
+    let next_cumulative_withdrawn_amount = input
+        .withdraw_amount
+        .checked_add(input.cumulative_withdrawn_amount)
+        .ok_or(WormholeProgramError::InvalidWithdrawAmount)?;
+    if next_cumulative_withdrawn_amount > input.deposit_amount {
+        return Err(WormholeProgramError::InvalidWithdrawAmount);
+    }
+
+    // Validate withdrawal index against other input fields.
     if input.withdrawal_index.is_zero() {
         if !input.cumulative_withdrawn_amount.is_zero() {
             panic!("cumulative withdrawn amount must be 0 for first withdrawal")
@@ -15,15 +37,6 @@ pub fn execute_wormhole_program(input: WormholeProgramInput) -> WormholeProgramO
         if !input.previous_nullifier_storage_proof.is_empty() {
             panic!("storage proof for previous nullifier must be empty")
         }
-    }
-
-    if input
-        .withdraw_amount
-        .checked_add(input.cumulative_withdrawn_amount)
-        .unwrap()
-        < input.deposit_amount
-    {
-        panic!("withdraw amounts exceed the original deposit amount")
     }
 
     // Verify the deposit account state proof.
@@ -38,30 +51,26 @@ pub fn execute_wormhole_program(input: WormholeProgramInput) -> WormholeProgramO
         deposit_address_nibbles,
         Some(expected),
         &input.deposit_account_proof,
-    )
-    .expect("deposit account proof validation failed");
+    )?;
 
     // Verify the Wormhole nullifier account state proof.
     let nullifier_address_nibbles = Nibbles::unpack(keccak256(&WORMHOLE_NULLIFIER_ADDRESS));
     let nullifier_leaf_node = {
         let last_node_encoded = input.nullifier_account_proof.last().unwrap();
-        let nullifier_node = TrieNode::decode(&mut &last_node_encoded[..])
-            .expect("nullifier trie node decoding failed");
+        let nullifier_node = TrieNode::decode(&mut &last_node_encoded[..])?;
         if let TrieNode::Leaf(leaf) = nullifier_node {
             leaf
         } else {
-            panic!("nullifier account must be present");
+            return Err(WormholeProgramError::NullifierAccountMissing);
         }
     };
-    let nullifier_account = TrieAccount::decode(&mut &nullifier_leaf_node.value[..])
-        .expect("nullifier trie account decoding failed");
+    let nullifier_account = TrieAccount::decode(&mut &nullifier_leaf_node.value[..])?;
     verify_proof(
         input.state_root,
         nullifier_address_nibbles,
         Some(nullifier_leaf_node.value),
         &input.nullifier_account_proof,
-    )
-    .expect("nullifier account proof validation failed");
+    )?;
 
     // Verify previous withdrawal nullifier inclusion storage proof.
     let cumulative_withdrawn_amount_hashed =
@@ -76,25 +85,25 @@ pub fn execute_wormhole_program(input: WormholeProgramInput) -> WormholeProgramO
             previous_nullifier_nibbles,
             Some(expected),
             &input.previous_nullifier_storage_proof,
-        )
-        .expect("previous nullifier inclusion storage proof validation failed");
+        )?;
     }
 
     // Compute current nullifier to commit to.
     let current_nullifier = input.secret.nullifier(input.withdrawal_index);
 
     // Return the program output.
-    WormholeProgramOutput {
+    Ok(WormholeProgramOutput {
         state_root: input.state_root,
         withdraw_amount: input.withdraw_amount,
         current_nullifier,
         cumulative_withdrawn_amount_hashed,
-    }
+    })
 }
 
 /// The input into zkvm program.
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(test, derive(Default))]
 pub struct WormholeProgramInput {
     /// The Wormhole secret.
     pub secret: WormholeSecret,
@@ -118,7 +127,7 @@ pub struct WormholeProgramInput {
 }
 
 /// The output of the zkvm program.
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WormholeProgramOutput {
     /// The state root of the block to validate against provided as part of the input.
@@ -129,4 +138,87 @@ pub struct WormholeProgramOutput {
     pub current_nullifier: B256,
     /// The keccak256 of cumulative withdrawn amount.
     pub cumulative_withdrawn_amount_hashed: B256,
+}
+
+/// The error returned by Wormhole program.
+#[derive(PartialEq, Eq, Debug)]
+pub enum WormholeProgramError {
+    InvalidSecret,
+    InvalidWithdrawAmount,
+    NullifierAccountMissing,
+    Rlp(alloy_rlp::Error),
+    Proof(ProofVerificationError),
+}
+
+impl core::error::Error for WormholeProgramError {}
+
+impl fmt::Display for WormholeProgramError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidSecret => write!(f, "invalid secret"),
+            Self::InvalidWithdrawAmount => write!(f, "invalid withdraw amount"),
+            Self::NullifierAccountMissing => write!(f, "nullifier account missing"),
+            Self::Rlp(error) => write!(f, "rlp: {error}"),
+            Self::Proof(error) => write!(f, "invalid proof: {error}"),
+        }
+    }
+}
+
+impl From<alloy_rlp::Error> for WormholeProgramError {
+    fn from(error: alloy_rlp::Error) -> Self {
+        Self::Rlp(error)
+    }
+}
+
+impl From<ProofVerificationError> for WormholeProgramError {
+    fn from(error: ProofVerificationError) -> Self {
+        Self::Proof(error)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_wormhole::secret::TEST_SECRET;
+
+    #[test]
+    fn invalid_secret() {
+        let mut input = WormholeProgramInput::default();
+        assert_eq!(
+            execute_wormhole_program(input.clone()),
+            Err(WormholeProgramError::InvalidSecret)
+        );
+
+        input.secret = WormholeSecret::new_unchecked(Bytes::from_static(&[0x1, 0x2, 0x3]));
+        assert_eq!(
+            execute_wormhole_program(input),
+            Err(WormholeProgramError::InvalidSecret)
+        );
+    }
+
+    #[test]
+    fn invalid_withdraw_amount() {
+        let mut input = WormholeProgramInput::default();
+        input.secret = TEST_SECRET;
+
+        assert_eq!(
+            execute_wormhole_program(input.clone()),
+            Err(WormholeProgramError::InvalidWithdrawAmount)
+        );
+
+        input.cumulative_withdrawn_amount = U256::MAX;
+        input.withdraw_amount = U256::from(2);
+        input.deposit_amount = U256::from(2);
+        assert_eq!(
+            execute_wormhole_program(input.clone()),
+            Err(WormholeProgramError::InvalidWithdrawAmount)
+        );
+
+        input.cumulative_withdrawn_amount = U256::ZERO;
+        input.deposit_amount = U256::from(1);
+        assert_eq!(
+            execute_wormhole_program(input.clone()),
+            Err(WormholeProgramError::InvalidWithdrawAmount)
+        );
+    }
 }

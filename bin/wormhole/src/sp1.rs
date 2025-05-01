@@ -1,11 +1,13 @@
-use alloy_primitives::{Bytes, B256, U256};
-use alloy_wormhole::{sp1::Sp1Input, WormholeSecret};
+use std::{fs, path::PathBuf};
+
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 
+use crate::input::ProgramInputArgs;
+
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
-pub const WORMHOLE_PROGRAM_ELF: &[u8] = include_elf!("wormhole-program");
+pub const WORMHOLE_PROGRAM_ELF: &[u8] = include_elf!("wormhole-program-sp1");
 
 #[derive(Parser, Debug)]
 pub struct Sp1Command {
@@ -13,7 +15,7 @@ pub struct Sp1Command {
     subcommand: Sp1Subcommand,
 
     #[clap(flatten)]
-    args: Sp1ProgramArgs,
+    input: ProgramInputArgs,
 }
 
 impl Sp1Command {
@@ -25,9 +27,8 @@ impl Sp1Command {
         let client = ProverClient::from_env();
 
         // Setup the inputs.
-        let sp1_input = self.args.into_input();
         let mut stdin = SP1Stdin::new();
-        stdin.write(&sp1_input);
+        stdin.write(&self.input.into_input());
 
         match self.subcommand {
             Sp1Subcommand::Execute => {
@@ -42,7 +43,7 @@ impl Sp1Command {
                 // Record the number of cycles executed.
                 println!("Number of cycles: {}", report.total_instruction_count());
             }
-            Sp1Subcommand::Prove { verify } => {
+            Sp1Subcommand::Prove { verify, out } => {
                 // Setup the program for proving.
                 let (pk, vk) = client.setup(WORMHOLE_PROGRAM_ELF);
 
@@ -53,8 +54,12 @@ impl Sp1Command {
                     .run()
                     .context("proof generation failed")?;
 
-                // TODO: optionally write to a file
-                println!("proof: {:?}", proof.bytes());
+                let proof_bytes = proof.bytes();
+                println!("proof: {proof_bytes:?}");
+
+                if let Some(out) = out {
+                    fs::write(out, proof_bytes)?;
+                }
 
                 if verify {
                     // Verify the proof.
@@ -77,52 +82,8 @@ pub enum Sp1Subcommand {
     Prove {
         /// Flag indicating whether we should verify the proof.
         verify: bool,
+
+        /// The optional path to write the proof to.
+        out: Option<PathBuf>,
     },
-}
-
-#[derive(Parser, Debug)]
-struct Sp1ProgramArgs {
-    #[clap(long)]
-    secret: Bytes,
-
-    #[clap(long)]
-    deposit_amount: U256,
-
-    #[clap(long)]
-    withdraw_amount: U256,
-
-    #[clap(long)]
-    cumulative_withdrawn_amount: U256,
-
-    #[clap(long)]
-    withdrawal_index: U256,
-
-    #[clap(long)]
-    state_root: B256,
-
-    #[clap(long, num_args = 1.., value_delimiter = ',')]
-    deposit_account_proof: Vec<Bytes>,
-
-    #[clap(long, num_args = 1.., value_delimiter = ',')]
-    nullifier_account_proof: Vec<Bytes>,
-
-    #[clap(long, value_delimiter = ',')]
-    previous_nullifier_storage_proof: Vec<Bytes>,
-}
-
-impl Sp1ProgramArgs {
-    fn into_input(self) -> Sp1Input {
-        let secret = WormholeSecret::try_from(self.secret).unwrap();
-        Sp1Input {
-            secret,
-            deposit_amount: self.deposit_amount,
-            withdraw_amount: self.withdraw_amount,
-            cumulative_withdrawn_amount: self.cumulative_withdrawn_amount,
-            withdrawal_index: self.withdrawal_index,
-            state_root: self.state_root,
-            deposit_account_proof: self.deposit_account_proof,
-            nullifier_account_proof: self.nullifier_account_proof,
-            previous_nullifier_storage_proof: self.previous_nullifier_storage_proof,
-        }
-    }
 }

@@ -1,10 +1,12 @@
 use alloy_primitives::{hex, U256};
 use alloy_wormhole::WormholeSecret;
 use clap::{Parser, Subcommand};
-use sp1::Sp1Command;
 use std::time::Instant;
 
+mod input;
+
 mod sp1;
+use sp1::Sp1Command;
 
 #[derive(Parser, Debug)]
 pub struct Cli {

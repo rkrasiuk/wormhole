@@ -12,7 +12,7 @@ fn main() {
     let input = risc0_zkvm::guest::env::read::<WormholeProgramInput>();
 
     // Execute the program.
-    let output = execute_wormhole_program(input);
+    let output = execute_wormhole_program(input).expect("program success");
 
     // Commit to the public values of the program.
     risc0_zkvm::guest::env::commit(&output);

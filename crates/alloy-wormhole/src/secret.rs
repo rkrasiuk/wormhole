@@ -106,6 +106,12 @@ fn sha256(data: impl AsRef<[u8]>) -> B256 {
     B256::new(hash.finalize().into())
 }
 
+/// A valid Wormhole secret that can be used for testing.
+#[cfg(any(test, feature = "test-utils"))]
+pub const TEST_SECRET: WormholeSecret = WormholeSecret(Bytes::from_static(&[
+    0x00, 0x00, 0x00, 0x00, 0x01, 0x30, 0x5d, 0xc6,
+]));
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,16 +119,21 @@ mod tests {
     use std::time::Instant;
 
     #[test]
+    fn test_secret_is_valid() {
+        assert!(TEST_SECRET.is_valid());
+    }
+
+    #[test]
     fn find_valid_secret() {
         let started_at = Instant::now();
         for i in 0..u64::MAX {
             let mut bytes = BytesMut::new();
-            bytes.put_u8(MAGIC_POW);
             bytes.put_u64(i);
 
             let secret = bytes.freeze();
             if is_valid_wormhole_secret(&secret) {
                 println!("found secret {i} in {:?}", started_at.elapsed());
+                println!("secret {:?}", alloy_primitives::hex::encode(&secret[..]));
                 break;
             }
         }
