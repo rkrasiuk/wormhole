@@ -1,0 +1,3 @@
+[profile.default]
+chain_id = 560048
+eth_rpc_url = "https://rpc.hoodi.ethpandaops.io"
