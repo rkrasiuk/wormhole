@@ -12,8 +12,16 @@ wormhole-program-core = { workspace = true, features = ["serde"] }
 # sp1
 sp1-sdk.workspace = true
 
+# risc0
+risc0-zkvm.workspace = true
+wormhole-program-risc0.workspace = true
+
 clap.workspace = true
 anyhow.workspace = true
 
 [build-dependencies]
 sp1-build.workspace = true
+risc0-build.workspace = true
+
+[package.metadata.risc0]
+methods = ["../../programs/risc0"]

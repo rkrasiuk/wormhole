@@ -8,6 +8,10 @@ mod input;
 mod sp1;
 use sp1::Sp1Command;
 
+#[allow(dead_code)]
+mod risc0;
+use risc0::Risc0Command;
+
 #[derive(Parser, Debug)]
 pub struct Cli {
     #[clap(subcommand)]
@@ -27,6 +31,7 @@ impl Cli {
                 Ok(())
             }
             Command::Sp1(cmd) => cmd.run(),
+            Command::Risc0(cmd) => cmd.run(),
         }
     }
 }
@@ -37,4 +42,6 @@ pub enum Command {
     NewSecret,
     #[command(name = "sp1")]
     Sp1(Sp1Command),
+    #[command(name = "risc0")]
+    Risc0(Risc0Command),
 }

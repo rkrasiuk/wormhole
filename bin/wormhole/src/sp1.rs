@@ -7,7 +7,7 @@ use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
 use crate::input::ProgramInputArgs;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
-pub const WORMHOLE_PROGRAM_ELF: &[u8] = include_elf!("wormhole-program-sp1");
+pub const WORMHOLE_PROGRAM_SP1_ELF: &[u8] = include_elf!("wormhole-program-sp1");
 
 #[derive(Parser, Debug)]
 pub struct Sp1Command {
@@ -33,7 +33,7 @@ impl Sp1Command {
         match self.subcommand {
             Sp1Subcommand::Execute => {
                 let (output, report) = client
-                    .execute(WORMHOLE_PROGRAM_ELF, &stdin)
+                    .execute(WORMHOLE_PROGRAM_SP1_ELF, &stdin)
                     .run()
                     .context("program execution failed")?;
 
@@ -45,7 +45,7 @@ impl Sp1Command {
             }
             Sp1Subcommand::Prove { verify, out } => {
                 // Setup the program for proving.
-                let (pk, vk) = client.setup(WORMHOLE_PROGRAM_ELF);
+                let (pk, vk) = client.setup(WORMHOLE_PROGRAM_SP1_ELF);
 
                 // Generate the proof
                 let proof = client
@@ -81,9 +81,11 @@ pub enum Sp1Subcommand {
     #[command(name = "prove")]
     Prove {
         /// Flag indicating whether we should verify the proof.
+        #[clap(long)]
         verify: bool,
 
         /// The optional path to write the proof to.
+        #[clap(long)]
         out: Option<PathBuf>,
     },
 }

@@ -8,6 +8,32 @@ use alloy_trie::{
 use alloy_wormhole::{WormholeSecret, WORMHOLE_NULLIFIER_ADDRESS};
 use core::fmt;
 
+/// Executes the Wormhole withdrawal verification program.
+///
+/// This function validates a user's withdrawal from a previously deposited (burned)
+/// amount in a privacy-preserving manner. It performs several cryptographic and
+/// state-based checks to ensure the withdrawal is legitimate:
+///
+/// 1. Validates the secret used to generate nullifiers.
+/// 2. Verifies the correctness of the withdrawal amount against deposit and previously
+///    withdrawn amounts.
+/// 3. Checks consistency of withdrawal index and related storage proof input.
+/// 4. Validates Merkle-Patricia Trie proofs for:
+///     - The deposit account state,
+///     - The Wormhole nullifier account,
+///     - The previous withdrawal's nullifier inclusion in storage (if applicable).
+///
+/// Upon successful validation, it computes the current nullifier for this withdrawal
+/// and returns the resulting program output.
+///
+/// # Parameters
+///
+/// * `input` - A [`WormholeProgramInput`] struct containing all required data for proof verification.
+///
+/// # Returns
+///
+/// * `Ok(WormholeProgramOutput)` - If all validations and proof checks succeed.
+/// * `Err(WormholeProgramError)` - If any validation fails, or if a decoding/proof error occurs.
 pub fn execute_wormhole_program(
     input: WormholeProgramInput,
 ) -> Result<WormholeProgramOutput, WormholeProgramError> {
@@ -143,10 +169,15 @@ pub struct WormholeProgramOutput {
 /// The error returned by Wormhole program.
 #[derive(PartialEq, Eq, Debug)]
 pub enum WormholeProgramError {
+    /// Provided secret is not valid.
     InvalidSecret,
+    /// The withdrawal amount is zero, overflows, or exceeds the deposited amount.
     InvalidWithdrawAmount,
+    /// The nullifier account proof does not contain a valid leaf.
     NullifierAccountMissing,
+    /// RLP decoding failure.
     Rlp(alloy_rlp::Error),
+    /// Merkle-Patricia Trie proof verification failure.
     Proof(ProofVerificationError),
 }
 
