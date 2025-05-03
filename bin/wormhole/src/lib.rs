@@ -3,7 +3,8 @@ use alloy_wormhole::WormholeSecret;
 use clap::{Parser, Subcommand};
 use std::time::Instant;
 
-mod input;
+mod create_input;
+use create_input::CreateInputCommand;
 
 mod sp1;
 use sp1::Sp1Command;
@@ -19,7 +20,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn run(self) -> anyhow::Result<()> {
+    pub async fn run(self) -> anyhow::Result<()> {
         match self.command {
             Command::NewSecret => {
                 let started_at = Instant::now();
@@ -30,6 +31,7 @@ impl Cli {
                 println!("Nullifier(0): {}", secret.nullifier(U256::ZERO));
                 Ok(())
             }
+            Command::CreateInput(cmd) => cmd.run().await,
             Command::Sp1(cmd) => cmd.run(),
             Command::Risc0(cmd) => cmd.run(),
         }
@@ -40,6 +42,8 @@ impl Cli {
 pub enum Command {
     #[command(name = "new-secret")]
     NewSecret,
+    #[command(name = "create-input")]
+    CreateInput(CreateInputCommand),
     #[command(name = "sp1")]
     Sp1(Sp1Command),
     #[command(name = "risc0")]

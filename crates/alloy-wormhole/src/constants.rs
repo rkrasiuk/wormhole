@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, U256};
+use alloy_primitives::U256;
 
 /// The salt byte for generating the magic burn address.
 pub const MAGIC_ADDRESS: u8 = 0xfe;
@@ -22,7 +22,3 @@ pub const MAX_DEPOSIT: U256 = U256::from_limbs([0xbc16d674ec800000, 0x1, 0x0, 0x
 
 /// The transaction type of the Wormhole transaction
 pub const WORMHOLE_TX_TYPE: u8 = 5;
-
-/// The contract address of Wormhole system contract.
-/// TODO: add
-pub const WORMHOLE_NULLIFIER_ADDRESS: Address = Address::ZERO;

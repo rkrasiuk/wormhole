@@ -1,10 +1,8 @@
-use std::{fs, path::PathBuf};
-
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use sp1_sdk::{include_elf, ProverClient, SP1Stdin};
-
-use crate::input::ProgramInputArgs;
+use std::{fs, path::PathBuf};
+use wormhole_program_core::WormholeProgramInput;
 
 /// The ELF (executable and linkable format) file for the Succinct RISC-V zkVM.
 pub const WORMHOLE_PROGRAM_SP1_ELF: &[u8] = include_elf!("wormhole-program-sp1");
@@ -14,8 +12,8 @@ pub struct Sp1Command {
     #[clap(subcommand)]
     subcommand: Sp1Subcommand,
 
-    #[clap(flatten)]
-    input: ProgramInputArgs,
+    #[clap(long)]
+    input: PathBuf,
 }
 
 impl Sp1Command {
@@ -27,8 +25,9 @@ impl Sp1Command {
         let client = ProverClient::from_env();
 
         // Setup the inputs.
+        let input: WormholeProgramInput = serde_json::from_slice(&fs::read(&self.input)?)?;
         let mut stdin = SP1Stdin::new();
-        stdin.write(&self.input.into_input());
+        stdin.write(&input);
 
         match self.subcommand {
             Sp1Subcommand::Execute => {

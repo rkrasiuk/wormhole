@@ -1,8 +1,9 @@
 use clap::Parser;
 use wormhole::Cli;
 
-fn main() {
-    if let Err(error) = Cli::parse().run() {
+#[tokio::main]
+async fn main() {
+    if let Err(error) = Cli::parse().run().await {
         eprintln!("Error: {error:?}");
         std::process::exit(1);
     }

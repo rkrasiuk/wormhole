@@ -1,11 +1,11 @@
-use alloy_primitives::{keccak256, Bytes, B256, U256};
+use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_trie::{
     nodes::TrieNode,
     proof::{verify_proof, ProofVerificationError},
     Nibbles, TrieAccount,
 };
-use alloy_wormhole::{WormholeSecret, WORMHOLE_NULLIFIER_ADDRESS};
+use alloy_wormhole::WormholeSecret;
 use core::fmt;
 
 /// Executes the Wormhole withdrawal verification program.
@@ -80,7 +80,7 @@ pub fn execute_wormhole_program(
     )?;
 
     // Verify the Wormhole nullifier account state proof.
-    let nullifier_address_nibbles = Nibbles::unpack(keccak256(&WORMHOLE_NULLIFIER_ADDRESS));
+    let nullifier_address_nibbles = Nibbles::unpack(keccak256(&input.nullifier_address));
     let nullifier_leaf_node = {
         let last_node_encoded = input.nullifier_account_proof.last().unwrap();
         let nullifier_node = TrieNode::decode(&mut &last_node_encoded[..])?;
@@ -119,6 +119,7 @@ pub fn execute_wormhole_program(
 
     // Return the program output.
     Ok(WormholeProgramOutput {
+        nullifier_address: input.nullifier_address,
         state_root: input.state_root,
         withdraw_amount: input.withdraw_amount,
         current_nullifier,
@@ -145,6 +146,8 @@ pub struct WormholeProgramInput {
     pub state_root: B256,
     /// The deposit account proof.
     pub deposit_account_proof: Vec<Bytes>,
+    /// The address of the nullifier system contract.
+    pub nullifier_address: Address,
     /// The Wormhole nullifier contract account proof.
     pub nullifier_account_proof: Vec<Bytes>,
     /// The inclusion storage proof of previous nullifier.
@@ -156,6 +159,8 @@ pub struct WormholeProgramInput {
 #[derive(PartialEq, Eq, Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WormholeProgramOutput {
+    /// The address of the nullifier system contract.
+    pub nullifier_address: Address,
     /// The state root of the block to validate against provided as part of the input.
     pub state_root: B256,
     /// The withdraw amount provided as part of the input.

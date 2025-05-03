@@ -31,14 +31,15 @@ redundant-clone = "warn"
 [workspace.dependencies]
 alloy-wormhole = { path = "crates/alloy-wormhole" }
 wormhole-program-core = { path = "crates/program-core" }
-wormhole-program-risc0 = { path = "programs/risc0" }
 
 # alloy
-alloy-primitives = { version = "0.8", default-features = false }
-alloy-eip2930 = { version = "0.1.0", default-features = false }
-alloy-serde = { version = "0.12", default-features = false }
-alloy-rlp = { version = "0.3.9", default-features = false }
-alloy-trie = { version = "0.7", default-features = false }
+alloy-primitives = { version = "1.0", default-features = false }
+alloy-eip2930 = { version = "0.2", default-features = false }
+alloy-eips = { version = "0.15", default-features = false }
+alloy-provider = { version = "0.15", default-features = false }
+alloy-serde = { version = "0.15", default-features = false }
+alloy-rlp = { version = "0.3", default-features = false }
+alloy-trie = { version = "0.8", default-features = false }
 
 # sp1
 sp1-sdk = "4.0.0"
@@ -57,6 +58,7 @@ serde = { version = "1.0", default-features = false }
 serde_with = { version = "3", default-features = false }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 
+tokio = { version = "1", default-features = false }
 anyhow = { version = "1", default-features = false }
 clap = { version = "4.0", features = ["derive", "env"] }
 sha2 = { version = "0.10", default-features = false }

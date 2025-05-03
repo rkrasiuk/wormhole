@@ -1,7 +1,7 @@
-use crate::input::ProgramInputArgs;
 use clap::{Parser, Subcommand};
 use risc0_zkvm::{default_executor, default_prover, ExecutorEnv, ProverOpts};
-use wormhole_program_core::WormholeProgramOutput;
+use std::{fs, path::PathBuf};
+use wormhole_program_core::{WormholeProgramInput, WormholeProgramOutput};
 
 include!(concat!(env!("OUT_DIR"), "/methods.rs"));
 
@@ -10,15 +10,16 @@ pub struct Risc0Command {
     #[clap(subcommand)]
     subcommand: Risc0Subcommand,
 
-    #[clap(flatten)]
-    input: ProgramInputArgs,
+    #[clap(long)]
+    input: PathBuf,
 }
 
 impl Risc0Command {
     pub fn run(self) -> anyhow::Result<()> {
+        let input: WormholeProgramInput = serde_json::from_slice(&fs::read(&self.input)?)?;
         let env = ExecutorEnv::builder()
             // Send input to the guest
-            .write(&self.input.into_input())?
+            .write(&input)?
             .build()?;
 
         match self.subcommand {
