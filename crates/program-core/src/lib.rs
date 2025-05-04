@@ -19,8 +19,8 @@ use core::fmt;
 /// state-based checks to ensure the withdrawal is legitimate:
 ///
 /// 1. Validates the secret used to generate nullifiers.
-/// 2. Verifies the correctness of the withdrawal amount against deposit and previously
-///    withdrawn amounts.
+/// 2. Verifies the correctness of the withdrawal amount against deposit and previously withdrawn
+///    amounts.
 /// 3. Checks consistency of withdrawal index and related storage proof input.
 /// 4. Validates Merkle-Patricia Trie proofs for:
 ///     - The deposit account state,
@@ -32,7 +32,8 @@ use core::fmt;
 ///
 /// # Parameters
 ///
-/// * `input` - A [`WormholeProgramInput`] struct containing all required data for proof verification.
+/// * `input` - A [`WormholeProgramInput`] struct containing all required data for proof
+///   verification.
 ///
 /// # Returns
 ///
@@ -72,10 +73,8 @@ pub fn execute_wormhole_program(
     // Verify the deposit account state proof.
     let deposit_address = input.secret.burn_address();
     let deposit_address_nibbles = Nibbles::unpack(keccak256(deposit_address));
-    let expected = alloy_rlp::encode(TrieAccount {
-        balance: input.deposit_amount,
-        ..Default::default()
-    });
+    let expected =
+        alloy_rlp::encode(TrieAccount { balance: input.deposit_amount, ..Default::default() });
     verify_proof(
         input.state_root,
         deposit_address_nibbles,
@@ -230,18 +229,12 @@ mod tests {
         );
 
         input.secret = WormholeSecret::new_unchecked(Bytes::from_static(&[0x1, 0x2, 0x3]));
-        assert_eq!(
-            execute_wormhole_program(input),
-            Err(WormholeProgramError::InvalidSecret)
-        );
+        assert_eq!(execute_wormhole_program(input), Err(WormholeProgramError::InvalidSecret));
     }
 
     #[test]
     fn invalid_withdraw_amount() {
-        let mut input = WormholeProgramInput {
-            secret: TEST_SECRET,
-            ..Default::default()
-        };
+        let mut input = WormholeProgramInput { secret: TEST_SECRET, ..Default::default() };
 
         assert_eq!(
             execute_wormhole_program(input.clone()),

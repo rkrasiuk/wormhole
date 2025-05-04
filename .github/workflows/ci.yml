@@ -1,0 +1,47 @@
+name: CI
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    test:
+        name: test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@stable
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - name: build
+              run: cargo build -p alloy-wormhole -p wormhole-program-core
+            - name: test
+              run: cargo test -p alloy-wormhole -p wormhole-program-core
+
+    clippy:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@clippy
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  cache-on-failure: true
+            - run: cargo clippy -p alloy-wormhole -p wormhole-program-core --all-targets --all-features
+              env:
+                  RUSTFLAGS: -Dwarnings
+
+    fmt:
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        steps:
+            - uses: actions/checkout@v3
+            - uses: dtolnay/rust-toolchain@nightly
+              with:
+                  components: rustfmt
+            - run: cargo fmt --all --check

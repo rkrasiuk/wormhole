@@ -47,11 +47,8 @@ impl Sp1Command {
                 let (pk, vk) = client.setup(WORMHOLE_PROGRAM_SP1_ELF);
 
                 // Generate the proof
-                let proof = client
-                    .prove(&pk, &stdin)
-                    .groth16()
-                    .run()
-                    .context("proof generation failed")?;
+                let proof =
+                    client.prove(&pk, &stdin).groth16().run().context("proof generation failed")?;
 
                 let proof_bytes = proof.bytes();
                 println!("proof: {proof_bytes:?}");
@@ -62,9 +59,7 @@ impl Sp1Command {
 
                 if verify {
                     // Verify the proof.
-                    client
-                        .verify(&proof, &vk)
-                        .context("proof verification failed")?;
+                    client.verify(&proof, &vk).context("proof verification failed")?;
                 }
             }
         };

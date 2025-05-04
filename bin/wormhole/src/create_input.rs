@@ -41,22 +41,14 @@ impl CreateInputCommand {
         let provider = RootProvider::<Ethereum>::connect(&self.rpc_url).await?;
 
         let block_id = BlockId::Number(BlockNumberOrTag::Latest);
-        let block = provider
-            .get_block(block_id)
-            .await?
-            .ok_or(anyhow::anyhow!("unknown block"))?;
+        let block = provider.get_block(block_id).await?.ok_or(anyhow::anyhow!("unknown block"))?;
 
         let deposit_address = secret.burn_address();
-        let deposit_proof = provider
-            .get_proof(deposit_address, Vec::new())
-            .block_id(block_id)
-            .await?;
+        let deposit_proof =
+            provider.get_proof(deposit_address, Vec::new()).block_id(block_id).await?;
 
         let cumulative_withdrawn_amount = self.cumulative_withdrawn_amount.unwrap_or_default();
-        if self
-            .withdraw_amount
-            .saturating_add(cumulative_withdrawn_amount)
-            > deposit_proof.balance
+        if self.withdraw_amount.saturating_add(cumulative_withdrawn_amount) > deposit_proof.balance
         {
             return Err(WormholeProgramError::InvalidWithdrawAmount.into());
         }
@@ -66,10 +58,8 @@ impl CreateInputCommand {
         if !withdrawal_index.is_zero() {
             nullifier_keys.push(secret.nullifier(withdrawal_index - U256::from(1)));
         }
-        let mut nullifier_proof = provider
-            .get_proof(self.nullifier_address, nullifier_keys)
-            .block_id(block_id)
-            .await?;
+        let mut nullifier_proof =
+            provider.get_proof(self.nullifier_address, nullifier_keys).block_id(block_id).await?;
         let previous_nullifier_storage_proof = if withdrawal_index.is_zero() {
             Vec::new()
         } else {
