@@ -47,11 +47,11 @@ Verifying this type of transaction requires confirming that:
 
 1. Removal of non-implemented EIP dependencies
 
-EIP-7503 requires [EIP-7708](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7708.md) and [EIP-7495](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7495.md) to be implemented.
+EIP-7503 requires [EIP-7708](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7708.md) and [EIP-7495](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7495.md) to be implemented. This implementation removes these dependencies by using state proofs for proving deposits and previous withdrawals.
 
 2. Multiple Deposits & Withdrawals
 
-This variation allows making multiple deposits to the same burn address.
+Unlike the original EIP, which is designed for single-use deposits per burn address, this implementation enables multiple deposits and incremental withdrawals from the same derived deposit address. This is managed using nullifier chains and cumulative withdrawal tracking.
 
 ## Usage
 
