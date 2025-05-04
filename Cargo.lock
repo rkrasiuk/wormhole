@@ -8168,6 +8168,7 @@ dependencies = [
  "clap",
  "risc0-build 2.1.1 (git+https://github.com/rkrasiuk/risc0?branch=patch-manifest-dir)",
  "risc0-zkvm",
+ "serde",
  "serde_json",
  "sp1-build",
  "sp1-sdk",

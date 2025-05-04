@@ -68,7 +68,7 @@ pub struct WormholeTx {
     /// The block number of the state root the proof is for.
     #[cfg_attr(feature = "serde", serde(with = "alloy_serde::quantity"))]
     pub proof_block_number: u64,
-    /// TODO:
+    /// The proof of program execution alongside public outputs.
     pub proof: WormholeTxProof,
 }
 

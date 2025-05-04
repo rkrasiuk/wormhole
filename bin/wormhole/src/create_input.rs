@@ -1,8 +1,9 @@
 use alloy_eips::{BlockId, BlockNumberOrTag};
-use alloy_primitives::{Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_provider::{network::Ethereum, Provider, RootProvider};
 use alloy_wormhole::WormholeSecret;
 use clap::Parser;
+use serde::{Deserialize, Serialize};
 use wormhole_program_core::{WormholeProgramError, WormholeProgramInput};
 
 #[derive(Parser, Debug)]
@@ -80,21 +81,37 @@ impl CreateInputCommand {
                 .proof
         };
 
-        let input = WormholeProgramInput {
-            secret,
-            deposit_amount: deposit_proof.balance,
-            withdraw_amount: self.withdraw_amount,
-            cumulative_withdrawn_amount,
-            withdrawal_index,
-            state_root: block.header.state_root,
-            deposit_account_proof: deposit_proof.account_proof,
-            nullifier_address: self.nullifier_address,
-            nullifier_account_proof: nullifier_proof.account_proof,
-            previous_nullifier_storage_proof,
+        let input = WormholeProgramInputExt {
+            inner: WormholeProgramInput {
+                secret,
+                deposit_amount: deposit_proof.balance,
+                withdraw_amount: self.withdraw_amount,
+                cumulative_withdrawn_amount,
+                withdrawal_index,
+                state_root: block.header.state_root,
+                deposit_account_proof: deposit_proof.account_proof,
+                nullifier_address: self.nullifier_address,
+                nullifier_account_proof: nullifier_proof.account_proof,
+                previous_nullifier_storage_proof,
+            },
+            block_number: block.header.number,
+            block_hash: block.header.hash,
         };
 
         println!("{}", serde_json::to_string_pretty(&input)?);
 
         Ok(())
     }
+}
+
+/// Wormhole program input extended with additional information.
+#[derive(Serialize, Deserialize, Debug)]
+struct WormholeProgramInputExt {
+    /// Program input.
+    #[serde(flatten)]
+    inner: WormholeProgramInput,
+    /// The block number proofs were generated at.
+    block_number: u64,
+    /// The block hash proofs were generated at.
+    block_hash: B256,
 }
