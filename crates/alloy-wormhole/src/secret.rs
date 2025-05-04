@@ -119,6 +119,7 @@ mod tests {
         assert!(TEST_SECRET.is_valid());
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn find_valid_secret() {
         let started_at = std::time::Instant::now();
