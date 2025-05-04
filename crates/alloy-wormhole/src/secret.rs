@@ -93,9 +93,7 @@ pub fn proof_of_work_secret_hash(secret: impl AsRef<[u8]>) -> B256 {
 #[inline]
 pub fn is_valid_wormhole_secret(secret: impl AsRef<[u8]>) -> bool {
     let pow_hash = proof_of_work_secret_hash(secret);
-    U256::from_be_bytes(*pow_hash)
-        .rem(POW_DIFFICULTY_U256)
-        .is_zero()
+    U256::from_be_bytes(*pow_hash).rem(POW_DIFFICULTY_U256).is_zero()
 }
 
 #[inline]
@@ -108,24 +106,23 @@ fn sha256(data: impl AsRef<[u8]>) -> B256 {
 
 /// A valid Wormhole secret that can be used for testing.
 #[cfg(any(test, feature = "test-utils"))]
-pub const TEST_SECRET: WormholeSecret = WormholeSecret(Bytes::from_static(&[
-    0x00, 0x00, 0x00, 0x00, 0x01, 0x30, 0x5d, 0xc6,
-]));
+pub const TEST_SECRET: WormholeSecret =
+    WormholeSecret(Bytes::from_static(&[0x00, 0x00, 0x00, 0x00, 0x01, 0x30, 0x5d, 0xc6]));
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use alloy_primitives::bytes::{BufMut, BytesMut};
-    use std::time::Instant;
 
     #[test]
     fn test_secret_is_valid() {
         assert!(TEST_SECRET.is_valid());
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn find_valid_secret() {
-        let started_at = Instant::now();
+        let started_at = std::time::Instant::now();
         for i in 0..u64::MAX {
             let mut bytes = BytesMut::new();
             bytes.put_u64(i);
