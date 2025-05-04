@@ -1,5 +1,7 @@
 //! Implementation of Wormhole.
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
 use alloy_eip2930::AccessList;
 use alloy_primitives::{Address, Bytes, ChainId, B256};
 

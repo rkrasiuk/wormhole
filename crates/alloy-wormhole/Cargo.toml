@@ -17,5 +17,6 @@ serde = { workspace = true, features = ["derive"], optional = true }
 serde_with = { workspace = true, optional = true }
 
 [features]
+std = []
 serde = ["dep:serde", "dep:serde_with", "dep:alloy-serde", "alloy-eip2930/serde"]
 test-utils = []

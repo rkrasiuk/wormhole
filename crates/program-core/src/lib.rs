@@ -1,3 +1,7 @@
+#![no_std]
+extern crate alloc;
+
+use alloc::{boxed::Box, vec::Vec};
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_trie::{
@@ -67,7 +71,7 @@ pub fn execute_wormhole_program(
 
     // Verify the deposit account state proof.
     let deposit_address = input.secret.burn_address();
-    let deposit_address_nibbles = Nibbles::unpack(keccak256(&deposit_address));
+    let deposit_address_nibbles = Nibbles::unpack(keccak256(deposit_address));
     let expected = alloy_rlp::encode(TrieAccount {
         balance: input.deposit_amount,
         ..Default::default()
@@ -80,7 +84,7 @@ pub fn execute_wormhole_program(
     )?;
 
     // Verify the Wormhole nullifier account state proof.
-    let nullifier_address_nibbles = Nibbles::unpack(keccak256(&input.nullifier_address));
+    let nullifier_address_nibbles = Nibbles::unpack(keccak256(input.nullifier_address));
     let nullifier_leaf_node = {
         let last_node_encoded = input.nullifier_account_proof.last().unwrap();
         let nullifier_node = TrieNode::decode(&mut &last_node_encoded[..])?;
@@ -183,7 +187,7 @@ pub enum WormholeProgramError {
     /// RLP decoding failure.
     Rlp(alloy_rlp::Error),
     /// Merkle-Patricia Trie proof verification failure.
-    Proof(ProofVerificationError),
+    Proof(Box<ProofVerificationError>),
 }
 
 impl core::error::Error for WormholeProgramError {}
@@ -208,7 +212,7 @@ impl From<alloy_rlp::Error> for WormholeProgramError {
 
 impl From<ProofVerificationError> for WormholeProgramError {
     fn from(error: ProofVerificationError) -> Self {
-        Self::Proof(error)
+        Self::Proof(Box::new(error))
     }
 }
 
@@ -234,8 +238,10 @@ mod tests {
 
     #[test]
     fn invalid_withdraw_amount() {
-        let mut input = WormholeProgramInput::default();
-        input.secret = TEST_SECRET;
+        let mut input = WormholeProgramInput {
+            secret: TEST_SECRET,
+            ..Default::default()
+        };
 
         assert_eq!(
             execute_wormhole_program(input.clone()),
