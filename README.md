@@ -119,4 +119,9 @@ $ wormhole <zkvm> prove --input input.json
 | `crates/alloy-wormhole`          | EIP-7503 primitives and spec implementation   |
 | `crates/wormhole-program-core`   | Core Wormhole program logic                   |
 | `programs/*`                     | Wormhole programs using various zkVM backends |
-| `contracts/`                     | Mock nullifier system contract                |  
+| `contracts/`                     | Mock nullifier system contract                |
+
+## Testing
+
+The `contracts` folder includes a `MockNullifierSystemContract` which can be deployed on a testnet and used as a stub for testing.
+It is deployed on hoodi [0xce8f0b46cc1527f27429938d3cc85bf7d270a8f6](https://hoodi.etherscan.io/address/0xce8f0b46cc1527f27429938d3cc85bf7d270a8f6), but only the deployer can set the storage slots.
