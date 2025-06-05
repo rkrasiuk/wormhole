@@ -2,8 +2,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use alloy_consensus::{
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
+    TxType,
+};
 use alloy_eip2930::AccessList;
-use alloy_primitives::{Address, Bytes, ChainId, B256};
+use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
+use core::mem;
 
 mod constants;
 pub use constants::*;
@@ -72,6 +77,231 @@ pub struct WormholeTx {
     pub proof_block_number: u64,
     /// The proof of program execution alongside public outputs.
     pub proof: WormholeTxProof,
+}
+
+impl WormholeTx {
+    /// Get the transaction type
+    #[doc(alias = "transaction_type")]
+    pub const fn tx_type() -> u8 {
+        WORMHOLE_TX_TYPE
+    }
+
+    /// Calculates a heuristic for the in-memory size of the [TxEip1559]
+    /// transaction.
+    #[inline]
+    pub fn size(&self) -> usize {
+        mem::size_of::<ChainId>() + // chain_id
+        mem::size_of::<u64>() + // nonce
+        mem::size_of::<u64>() + // gas_limit
+        mem::size_of::<u128>() + // max_fee_per_gas
+        mem::size_of::<u128>() + // max_priority_fee_per_gas
+        self.to.size() + // to
+        mem::size_of::<U256>() + // value
+        self.access_list.size() + // access_list
+        self.input.len() + // input
+        mem::size_of::<u64>() + // proof_block_number
+        self.proof.state_root.length() // proof.state_root
+    }
+}
+
+impl RlpEcdsaEncodableTx for WormholeTx {
+    /// Outputs the length of the transaction's fields, without a RLP header.
+    fn rlp_encoded_fields_length(&self) -> usize {
+        self.chain_id.length() +
+            self.nonce.length() +
+            self.max_priority_fee_per_gas.length() +
+            self.max_fee_per_gas.length() +
+            self.gas_limit.length() +
+            self.to.length() +
+            self.value.length() +
+            self.input.0.length() +
+            self.access_list.length()
+    }
+
+    /// Encodes only the transaction's fields into the desired buffer, without
+    /// a RLP header.
+    fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.chain_id.encode(out);
+        self.nonce.encode(out);
+        self.max_priority_fee_per_gas.encode(out);
+        self.max_fee_per_gas.encode(out);
+        self.gas_limit.encode(out);
+        self.to.encode(out);
+        self.value.encode(out);
+        self.input.0.encode(out);
+        self.access_list.encode(out);
+    }
+}
+
+impl RlpEcdsaDecodableTx for TxEip1559 {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+
+    /// Decodes the inner [TxEip1559] fields from RLP bytes.
+    ///
+    /// NOTE: This assumes a RLP header has already been decoded, and _just_
+    /// decodes the following RLP fields in the following order:
+    ///
+    /// - `chain_id`
+    /// - `nonce`
+    /// - `max_priority_fee_per_gas`
+    /// - `max_fee_per_gas`
+    /// - `gas_limit`
+    /// - `to`
+    /// - `value`
+    /// - `data` (`input`)
+    /// - `access_list`
+    fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            chain_id: Decodable::decode(buf)?,
+            nonce: Decodable::decode(buf)?,
+            max_priority_fee_per_gas: Decodable::decode(buf)?,
+            max_fee_per_gas: Decodable::decode(buf)?,
+            gas_limit: Decodable::decode(buf)?,
+            to: Decodable::decode(buf)?,
+            value: Decodable::decode(buf)?,
+            input: Decodable::decode(buf)?,
+            access_list: Decodable::decode(buf)?,
+        })
+    }
+}
+
+impl Transaction for TxEip1559 {
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
+        Some(self.chain_id)
+    }
+
+    #[inline]
+    fn nonce(&self) -> u64 {
+        self.nonce
+    }
+
+    #[inline]
+    fn gas_limit(&self) -> u64 {
+        self.gas_limit
+    }
+
+    #[inline]
+    fn gas_price(&self) -> Option<u128> {
+        None
+    }
+
+    #[inline]
+    fn max_fee_per_gas(&self) -> u128 {
+        self.max_fee_per_gas
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        Some(self.max_priority_fee_per_gas)
+    }
+
+    #[inline]
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
+    #[inline]
+    fn priority_fee_or_price(&self) -> u128 {
+        self.max_priority_fee_per_gas
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
+            // if the tip is greater than the max priority fee per gas, set it to the max
+            // priority fee per gas + base fee
+            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
+            if tip > self.max_priority_fee_per_gas {
+                self.max_priority_fee_per_gas + base_fee as u128
+            } else {
+                // otherwise return the max fee per gas
+                self.max_fee_per_gas
+            }
+        })
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn kind(&self) -> TxKind {
+        self.to
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.to.is_create()
+    }
+
+    #[inline]
+    fn value(&self) -> U256 {
+        self.value
+    }
+
+    #[inline]
+    fn input(&self) -> &Bytes {
+        &self.input
+    }
+
+    #[inline]
+    fn access_list(&self) -> Option<&AccessList> {
+        Some(&self.access_list)
+    }
+
+    #[inline]
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    #[inline]
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
+    }
+}
+
+impl Typed2718 for TxEip1559 {
+    fn ty(&self) -> u8 {
+        TxType::Eip1559 as u8
+    }
+}
+
+impl IsTyped2718 for TxEip1559 {
+    fn is_type(type_id: u8) -> bool {
+        matches!(type_id, 0x02)
+    }
+}
+
+impl SignableTransaction<Signature> for TxEip1559 {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.chain_id = chain_id;
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
+        out.put_u8(Self::tx_type() as u8);
+        self.encode(out)
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        self.length() + 1
+    }
+}
+
+impl Encodable for TxEip1559 {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.rlp_encode(out);
+    }
+
+    fn length(&self) -> usize {
+        self.rlp_encoded_length()
+    }
+}
+
+impl Decodable for TxEip1559 {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode(buf)
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
