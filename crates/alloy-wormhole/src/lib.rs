@@ -4,10 +4,12 @@
 
 use alloy_consensus::{
     transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
-    TxType,
+    Transaction, Typed2718,
 };
 use alloy_eip2930::AccessList;
-use alloy_primitives::{Address, Bytes, ChainId, B256, U256};
+use alloy_eips::{eip2718::IsTyped2718, eip7702::SignedAuthorization};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_rlp::{BufMut, Decodable, Encodable};
 use core::mem;
 
 mod constants;
@@ -86,7 +88,7 @@ impl WormholeTx {
         WORMHOLE_TX_TYPE
     }
 
-    /// Calculates a heuristic for the in-memory size of the [TxEip1559]
+    /// Calculates a heuristic for the in-memory size of the [WormholeTx].
     /// transaction.
     #[inline]
     pub fn size(&self) -> usize {
@@ -95,12 +97,11 @@ impl WormholeTx {
         mem::size_of::<u64>() + // gas_limit
         mem::size_of::<u128>() + // max_fee_per_gas
         mem::size_of::<u128>() + // max_priority_fee_per_gas
-        self.to.size() + // to
-        mem::size_of::<U256>() + // value
+        mem::size_of::<Address>() + // to
+        self.input.len() + // input      
         self.access_list.size() + // access_list
-        self.input.len() + // input
         mem::size_of::<u64>() + // proof_block_number
-        self.proof.state_root.length() // proof.state_root
+        mem::size_of::<WormholeTxProof>() // proof
     }
 }
 
@@ -113,9 +114,10 @@ impl RlpEcdsaEncodableTx for WormholeTx {
             self.max_fee_per_gas.length() +
             self.gas_limit.length() +
             self.to.length() +
-            self.value.length() +
             self.input.0.length() +
-            self.access_list.length()
+            self.access_list.length() +
+            self.proof_block_number.length() +
+            self.proof.length()
     }
 
     /// Encodes only the transaction's fields into the desired buffer, without
@@ -127,16 +129,17 @@ impl RlpEcdsaEncodableTx for WormholeTx {
         self.max_fee_per_gas.encode(out);
         self.gas_limit.encode(out);
         self.to.encode(out);
-        self.value.encode(out);
         self.input.0.encode(out);
         self.access_list.encode(out);
+        self.proof_block_number.encode(out);
+        self.proof.encode(out);
     }
 }
 
-impl RlpEcdsaDecodableTx for TxEip1559 {
+impl RlpEcdsaDecodableTx for WormholeTx {
     const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
 
-    /// Decodes the inner [TxEip1559] fields from RLP bytes.
+    /// Decodes the inner [WormholeTx] fields from RLP bytes.
     ///
     /// NOTE: This assumes a RLP header has already been decoded, and _just_
     /// decodes the following RLP fields in the following order:
@@ -150,6 +153,8 @@ impl RlpEcdsaDecodableTx for TxEip1559 {
     /// - `value`
     /// - `data` (`input`)
     /// - `access_list`
+    /// - `proof_block_number`
+    /// - `proof`
     fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Ok(Self {
             chain_id: Decodable::decode(buf)?,
@@ -158,14 +163,15 @@ impl RlpEcdsaDecodableTx for TxEip1559 {
             max_fee_per_gas: Decodable::decode(buf)?,
             gas_limit: Decodable::decode(buf)?,
             to: Decodable::decode(buf)?,
-            value: Decodable::decode(buf)?,
             input: Decodable::decode(buf)?,
             access_list: Decodable::decode(buf)?,
+            proof_block_number: Decodable::decode(buf)?,
+            proof: Decodable::decode(buf)?,
         })
     }
 }
 
-impl Transaction for TxEip1559 {
+impl Transaction for WormholeTx {
     #[inline]
     fn chain_id(&self) -> Option<ChainId> {
         Some(self.chain_id)
@@ -226,18 +232,8 @@ impl Transaction for TxEip1559 {
     }
 
     #[inline]
-    fn kind(&self) -> TxKind {
-        self.to
-    }
-
-    #[inline]
-    fn is_create(&self) -> bool {
-        self.to.is_create()
-    }
-
-    #[inline]
     fn value(&self) -> U256 {
-        self.value
+        U256::ZERO
     }
 
     #[inline]
@@ -259,21 +255,31 @@ impl Transaction for TxEip1559 {
     fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
         None
     }
+
+    #[inline]
+    fn kind(&self) -> TxKind {
+        None.into()
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        self.to.is_zero()
+    }
 }
 
-impl Typed2718 for TxEip1559 {
+impl Typed2718 for WormholeTx {
     fn ty(&self) -> u8 {
-        TxType::Eip1559 as u8
+        WORMHOLE_TX_TYPE
     }
 }
 
-impl IsTyped2718 for TxEip1559 {
-    fn is_type(type_id: u8) -> bool {
-        matches!(type_id, 0x02)
+impl IsTyped2718 for WormholeTx {
+    fn is_type(_type_id: u8) -> bool {
+        false
     }
 }
 
-impl SignableTransaction<Signature> for TxEip1559 {
+impl SignableTransaction<Signature> for WormholeTx {
     fn set_chain_id(&mut self, chain_id: ChainId) {
         self.chain_id = chain_id;
     }
@@ -288,7 +294,7 @@ impl SignableTransaction<Signature> for TxEip1559 {
     }
 }
 
-impl Encodable for TxEip1559 {
+impl Encodable for WormholeTx {
     fn encode(&self, out: &mut dyn BufMut) {
         self.rlp_encode(out);
     }
@@ -298,7 +304,7 @@ impl Encodable for TxEip1559 {
     }
 }
 
-impl Decodable for TxEip1559 {
+impl Decodable for WormholeTx {
     fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
         Self::rlp_decode(buf)
     }
@@ -315,4 +321,31 @@ pub struct WormholeTxProof {
     pub withdraw_value: u128,
     /// The ZK proof of the program execution.
     pub proof: Bytes,
+}
+
+impl Encodable for WormholeTxProof {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.state_root.encode(out);
+        self.nullifier.encode(out);
+        self.withdraw_value.encode(out);
+        self.proof.encode(out);
+    }
+
+    fn length(&self) -> usize {
+        self.state_root.length() +
+            self.nullifier.length() +
+            self.withdraw_value.length() +
+            self.proof.length()
+    }
+}
+
+impl Decodable for WormholeTxProof {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            state_root: Decodable::decode(buf)?,
+            nullifier: Decodable::decode(buf)?,
+            withdraw_value: Decodable::decode(buf)?,
+            proof: Decodable::decode(buf)?,
+        })
+    }
 }

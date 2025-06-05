@@ -9,7 +9,7 @@ alloy-eip2930 = { workspace = true, default-features = false }
 alloy-serde = { workspace = true, optional = true }
 alloy-consensus.workspace = true
 alloy-rlp.workspace = true
-
+alloy-eips.workspace = true
 sha2 = { workspace = true, default-features = false }
 getrandom.workspace = true
 derive_more = { version = "2", default-features = false, features = ["as_ref"] }

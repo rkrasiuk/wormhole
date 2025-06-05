@@ -709,6 +709,7 @@ version = "0.12.5"
 dependencies = [
  "alloy-consensus 1.0.9",
  "alloy-eip2930",
+ "alloy-eips 1.0.9",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-serde 1.0.9",
