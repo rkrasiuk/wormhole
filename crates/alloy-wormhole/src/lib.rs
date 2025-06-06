@@ -1,6 +1,7 @@
 //! Implementation of Wormhole.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
 use alloy_consensus::{
     transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
@@ -9,7 +10,7 @@ use alloy_consensus::{
 use alloy_eip2930::AccessList;
 use alloy_eips::{eip2718::IsTyped2718, eip7702::SignedAuthorization};
 use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
-use alloy_rlp::{BufMut, Decodable, Encodable};
+use alloy_rlp::{BufMut, Decodable, Encodable, RlpDecodable, RlpEncodable};
 use core::mem;
 
 mod constants;
@@ -258,12 +259,12 @@ impl Transaction for WormholeTx {
 
     #[inline]
     fn kind(&self) -> TxKind {
-        None.into()
+        self.to.into()
     }
 
     #[inline]
     fn is_create(&self) -> bool {
-        self.to.is_zero()
+        false
     }
 }
 
@@ -274,8 +275,8 @@ impl Typed2718 for WormholeTx {
 }
 
 impl IsTyped2718 for WormholeTx {
-    fn is_type(_type_id: u8) -> bool {
-        false
+    fn is_type(type_id: u8) -> bool {
+        type_id == WORMHOLE_TX_TYPE
     }
 }
 
@@ -310,7 +311,7 @@ impl Decodable for WormholeTx {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WormholeTxProof {
     /// The state root of the block number deposit was validated against.
@@ -323,29 +324,39 @@ pub struct WormholeTxProof {
     pub proof: Bytes,
 }
 
-impl Encodable for WormholeTxProof {
-    fn encode(&self, out: &mut dyn BufMut) {
-        self.state_root.encode(out);
-        self.nullifier.encode(out);
-        self.withdraw_value.encode(out);
-        self.proof.encode(out);
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+    use alloy_primitives::{address, b256, hex};
+    #[test]
+    fn encode_decode_wormholetx() {
+        let hash: B256 =
+            b256!("0xa71451f735e5888c5bf6e5a16f0f9f2d4a003ed103987b510e312b57205e7c7b");
 
-    fn length(&self) -> usize {
-        self.state_root.length() +
-            self.nullifier.length() +
-            self.withdraw_value.length() +
-            self.proof.length()
-    }
-}
+        let tx =  WormholeTx {
+                chain_id: 1,
+                nonce: 0x42,
+                gas_limit: 44386,
+                to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
+                input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
+                max_fee_per_gas: 0x4a817c800,
+                max_priority_fee_per_gas: 0x3b9aca00,
+                access_list: AccessList::default(),
+                proof_block_number:1,
+                proof: WormholeTxProof::default()
+            };
 
-impl Decodable for WormholeTxProof {
-    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
-        Ok(Self {
-            state_root: Decodable::decode(buf)?,
-            nullifier: Decodable::decode(buf)?,
-            withdraw_value: Decodable::decode(buf)?,
-            proof: Decodable::decode(buf)?,
-        })
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        );
+
+        let mut buf = vec![];
+        tx.rlp_encode_signed(&sig, &mut buf);
+        let decoded = WormholeTx::rlp_decode_signed(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+        assert_eq!(*decoded.hash(), hash);
     }
 }
