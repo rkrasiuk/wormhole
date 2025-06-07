@@ -138,7 +138,7 @@ impl RlpEcdsaEncodableTx for WormholeTx {
 }
 
 impl RlpEcdsaDecodableTx for WormholeTx {
-    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() as u8 };
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() };
 
     /// Decodes the inner [WormholeTx] fields from RLP bytes.
     ///
@@ -286,7 +286,7 @@ impl SignableTransaction<Signature> for WormholeTx {
     }
 
     fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
-        out.put_u8(Self::tx_type() as u8);
+        out.put_u8(Self::tx_type());
         self.encode(out)
     }
 
@@ -338,7 +338,7 @@ mod tests {
                 chain_id: 1,
                 nonce: 0x42,
                 gas_limit: 44386,
-                to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6").into(),
+                to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6"),
                 input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
                 max_fee_per_gas: 0x4a817c800,
                 max_priority_fee_per_gas: 0x3b9aca00,
