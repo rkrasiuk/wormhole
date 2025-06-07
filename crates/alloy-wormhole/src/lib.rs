@@ -1,9 +1,17 @@
 //! Implementation of Wormhole.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+extern crate alloc;
 
+use alloy_consensus::{
+    transaction::{RlpEcdsaDecodableTx, RlpEcdsaEncodableTx, SignableTransaction},
+    Transaction, Typed2718,
+};
 use alloy_eip2930::AccessList;
-use alloy_primitives::{Address, Bytes, ChainId, B256};
+use alloy_eips::{eip2718::IsTyped2718, eip7702::SignedAuthorization};
+use alloy_primitives::{Address, Bytes, ChainId, Signature, TxKind, B256, U256};
+use alloy_rlp::{BufMut, Decodable, Encodable, RlpDecodable, RlpEncodable};
+use core::mem;
 
 mod constants;
 pub use constants::*;
@@ -74,7 +82,236 @@ pub struct WormholeTx {
     pub proof: WormholeTxProof,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+impl WormholeTx {
+    /// Get the transaction type
+    #[doc(alias = "transaction_type")]
+    pub const fn tx_type() -> u8 {
+        WORMHOLE_TX_TYPE
+    }
+
+    /// Calculates a heuristic for the in-memory size of the [WormholeTx].
+    /// transaction.
+    #[inline]
+    pub fn size(&self) -> usize {
+        mem::size_of::<ChainId>() + // chain_id
+        mem::size_of::<u64>() + // nonce
+        mem::size_of::<u64>() + // gas_limit
+        mem::size_of::<u128>() + // max_fee_per_gas
+        mem::size_of::<u128>() + // max_priority_fee_per_gas
+        mem::size_of::<Address>() + // to
+        self.input.len() + // input      
+        self.access_list.size() + // access_list
+        mem::size_of::<u64>() + // proof_block_number
+        mem::size_of::<WormholeTxProof>() // proof
+    }
+}
+
+impl RlpEcdsaEncodableTx for WormholeTx {
+    /// Outputs the length of the transaction's fields, without a RLP header.
+    fn rlp_encoded_fields_length(&self) -> usize {
+        self.chain_id.length() +
+            self.nonce.length() +
+            self.max_priority_fee_per_gas.length() +
+            self.max_fee_per_gas.length() +
+            self.gas_limit.length() +
+            self.to.length() +
+            self.input.0.length() +
+            self.access_list.length() +
+            self.proof_block_number.length() +
+            self.proof.length()
+    }
+
+    /// Encodes only the transaction's fields into the desired buffer, without
+    /// a RLP header.
+    fn rlp_encode_fields(&self, out: &mut dyn alloy_rlp::BufMut) {
+        self.chain_id.encode(out);
+        self.nonce.encode(out);
+        self.max_priority_fee_per_gas.encode(out);
+        self.max_fee_per_gas.encode(out);
+        self.gas_limit.encode(out);
+        self.to.encode(out);
+        self.input.0.encode(out);
+        self.access_list.encode(out);
+        self.proof_block_number.encode(out);
+        self.proof.encode(out);
+    }
+}
+
+impl RlpEcdsaDecodableTx for WormholeTx {
+    const DEFAULT_TX_TYPE: u8 = { Self::tx_type() };
+
+    /// Decodes the inner [WormholeTx] fields from RLP bytes.
+    ///
+    /// NOTE: This assumes a RLP header has already been decoded, and _just_
+    /// decodes the following RLP fields in the following order:
+    ///
+    /// - `chain_id`
+    /// - `nonce`
+    /// - `max_priority_fee_per_gas`
+    /// - `max_fee_per_gas`
+    /// - `gas_limit`
+    /// - `to`
+    /// - `value`
+    /// - `data` (`input`)
+    /// - `access_list`
+    /// - `proof_block_number`
+    /// - `proof`
+    fn rlp_decode_fields(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Ok(Self {
+            chain_id: Decodable::decode(buf)?,
+            nonce: Decodable::decode(buf)?,
+            max_priority_fee_per_gas: Decodable::decode(buf)?,
+            max_fee_per_gas: Decodable::decode(buf)?,
+            gas_limit: Decodable::decode(buf)?,
+            to: Decodable::decode(buf)?,
+            input: Decodable::decode(buf)?,
+            access_list: Decodable::decode(buf)?,
+            proof_block_number: Decodable::decode(buf)?,
+            proof: Decodable::decode(buf)?,
+        })
+    }
+}
+
+impl Transaction for WormholeTx {
+    #[inline]
+    fn chain_id(&self) -> Option<ChainId> {
+        Some(self.chain_id)
+    }
+
+    #[inline]
+    fn nonce(&self) -> u64 {
+        self.nonce
+    }
+
+    #[inline]
+    fn gas_limit(&self) -> u64 {
+        self.gas_limit
+    }
+
+    #[inline]
+    fn gas_price(&self) -> Option<u128> {
+        None
+    }
+
+    #[inline]
+    fn max_fee_per_gas(&self) -> u128 {
+        self.max_fee_per_gas
+    }
+
+    #[inline]
+    fn max_priority_fee_per_gas(&self) -> Option<u128> {
+        Some(self.max_priority_fee_per_gas)
+    }
+
+    #[inline]
+    fn max_fee_per_blob_gas(&self) -> Option<u128> {
+        None
+    }
+
+    #[inline]
+    fn priority_fee_or_price(&self) -> u128 {
+        self.max_priority_fee_per_gas
+    }
+
+    fn effective_gas_price(&self, base_fee: Option<u64>) -> u128 {
+        base_fee.map_or(self.max_fee_per_gas, |base_fee| {
+            // if the tip is greater than the max priority fee per gas, set it to the max
+            // priority fee per gas + base fee
+            let tip = self.max_fee_per_gas.saturating_sub(base_fee as u128);
+            if tip > self.max_priority_fee_per_gas {
+                self.max_priority_fee_per_gas + base_fee as u128
+            } else {
+                // otherwise return the max fee per gas
+                self.max_fee_per_gas
+            }
+        })
+    }
+
+    #[inline]
+    fn is_dynamic_fee(&self) -> bool {
+        true
+    }
+
+    #[inline]
+    fn value(&self) -> U256 {
+        U256::ZERO
+    }
+
+    #[inline]
+    fn input(&self) -> &Bytes {
+        &self.input
+    }
+
+    #[inline]
+    fn access_list(&self) -> Option<&AccessList> {
+        Some(&self.access_list)
+    }
+
+    #[inline]
+    fn blob_versioned_hashes(&self) -> Option<&[B256]> {
+        None
+    }
+
+    #[inline]
+    fn authorization_list(&self) -> Option<&[SignedAuthorization]> {
+        None
+    }
+
+    #[inline]
+    fn kind(&self) -> TxKind {
+        self.to.into()
+    }
+
+    #[inline]
+    fn is_create(&self) -> bool {
+        false
+    }
+}
+
+impl Typed2718 for WormholeTx {
+    fn ty(&self) -> u8 {
+        WORMHOLE_TX_TYPE
+    }
+}
+
+impl IsTyped2718 for WormholeTx {
+    fn is_type(type_id: u8) -> bool {
+        type_id == WORMHOLE_TX_TYPE
+    }
+}
+
+impl SignableTransaction<Signature> for WormholeTx {
+    fn set_chain_id(&mut self, chain_id: ChainId) {
+        self.chain_id = chain_id;
+    }
+
+    fn encode_for_signing(&self, out: &mut dyn alloy_rlp::BufMut) {
+        out.put_u8(Self::tx_type());
+        self.encode(out)
+    }
+
+    fn payload_len_for_signature(&self) -> usize {
+        self.length() + 1
+    }
+}
+
+impl Encodable for WormholeTx {
+    fn encode(&self, out: &mut dyn BufMut) {
+        self.rlp_encode(out);
+    }
+
+    fn length(&self) -> usize {
+        self.rlp_encoded_length()
+    }
+}
+
+impl Decodable for WormholeTx {
+    fn decode(buf: &mut &[u8]) -> alloy_rlp::Result<Self> {
+        Self::rlp_decode(buf)
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, RlpEncodable, RlpDecodable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct WormholeTxProof {
     /// The state root of the block number deposit was validated against.
@@ -85,4 +322,41 @@ pub struct WormholeTxProof {
     pub withdraw_value: u128,
     /// The ZK proof of the program execution.
     pub proof: Bytes,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+    use alloy_primitives::{address, b256, hex};
+    #[test]
+    fn encode_decode_wormholetx() {
+        let hash: B256 =
+            b256!("0xa71451f735e5888c5bf6e5a16f0f9f2d4a003ed103987b510e312b57205e7c7b");
+
+        let tx =  WormholeTx {
+                chain_id: 1,
+                nonce: 0x42,
+                gas_limit: 44386,
+                to: address!("6069a6c32cf691f5982febae4faf8a6f3ab2f0f6"),
+                input:  hex!("a22cb4650000000000000000000000005eee75727d804a2b13038928d36f8b188945a57a0000000000000000000000000000000000000000000000000000000000000000").into(),
+                max_fee_per_gas: 0x4a817c800,
+                max_priority_fee_per_gas: 0x3b9aca00,
+                access_list: AccessList::default(),
+                proof_block_number:1,
+                proof: WormholeTxProof::default()
+            };
+
+        let sig = Signature::from_scalars_and_parity(
+            b256!("840cfc572845f5786e702984c2a582528cad4b49b2a10b9db1be7fca90058565"),
+            b256!("25e7109ceb98168d95b09b18bbf6b685130e0562f233877d492b94eee0c5b6d1"),
+            false,
+        );
+
+        let mut buf = vec![];
+        tx.rlp_encode_signed(&sig, &mut buf);
+        let decoded = WormholeTx::rlp_decode_signed(&mut &buf[..]).unwrap();
+        assert_eq!(decoded, tx.into_signed(sig));
+        assert_eq!(*decoded.hash(), hash);
+    }
 }
